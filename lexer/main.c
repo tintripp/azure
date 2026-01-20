@@ -1,23 +1,36 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <string.h>
 
 typedef enum  {
+    WHITESPACE,
     IDENTIFIER,
+    LITERAL,
+    OPERATOR,
     KEYWORD,
     SEPARATOR,
-    OPERATOR,
-    LITERAL,
     // COMMENT, this will be ignored
 } TokenType;
 
 typedef struct {
     TokenType type;
+
+    size_t lexcap;
     char *lexeme;
+
     // optionally, location info for error messages
 } Token;
 
+void Token_Init(Token *token, int lexcap){
+    token->type = WHITESPACE;
+
+    token->lexcap = lexcap;
+    token->lexeme = calloc(token->lexcap, sizeof(char));
+}
+
 typedef struct {
+    const char *filename;
     const char *source;
     size_t length;
     size_t pos;
@@ -25,14 +38,46 @@ typedef struct {
     int column;
 } Lexer;
 
-void Lexer_Init(Lexer *lexer, const char *source, int length){
+void Lexer_Init(
+    Lexer *lexer, const char *filename, const char *source, size_t length
+){
+    lexer->filename = filename;
     lexer->source = source;
     lexer->length = length;
-
+    lexer->pos = 0;
 }
 
-bool Lexer_NextToken(Lexer *lexer, Token *out){
-    printf("NextToken");
+bool Lexer_NextToken(Lexer *lexer, Token *token){
+    printf("NextToken\n");
+
+    if (lexer->pos >= lexer->length) {
+        printf("Finished");
+        return false;
+    }
+    
+    int i = 0; // for lexeme
+    while(
+        lexer->pos < lexer->length &&
+        lexer->source[lexer->pos] != ' '
+    ){
+        if (i >= token->lexcap){
+            token->lexcap *= 2;
+
+            char *new = realloc(token->lexeme, token->lexcap);
+            if (!new){
+                free(token->lexeme);
+                exit(1);
+            }
+
+            token->lexeme = new;
+        }
+
+        token->lexeme[i++] = lexer->source[lexer->pos++];
+    }
+    token->lexeme[i] = '\0';
+
+    return true; // DO repeat
+    // if no more, return false
 }
 
 size_t Lexer_FileSize(FILE *f){
@@ -48,37 +93,50 @@ size_t Lexer_FileSize(FILE *f){
     return (size_t)size;
 }
 
-char *Lexer_ReadFile(FILE *f){
+char *Lexer_ReadFile(const char *name) {
+    FILE *f = fopen(name, "rb");
+    if (!f) return NULL;
 
-    char *str = malloc(Lexer_FileSize(f) + 1); // + 1 for nullterm
-    int c, i = 0;
-    while((c = fgetc(f)) != EOF) {
-        str[i++] = c;
+    size_t size = Lexer_FileSize(f);
+    if (size == (size_t)-1) { fclose(f); return NULL; }
+
+    char *buffer = malloc(size + 1); // +1 for null terminator
+    if (!buffer) { fclose(f); return NULL; }
+
+    size_t read = fread(buffer, 1, size, f);
+    if (read != size) {
+        free(buffer);
+        fclose(f);
+        return NULL;
     }
 
-    str[i] = '\0';
-
-    return str;
+    buffer[size] = '\0'; // null terminate
+    fclose(f);
+    return buffer;
 }
 
 int main(int argc, char *argv[]) {
-    printf("Azure Lexer\ninput: %s\n",argv[1]);
+    printf("Azure Lexer\ninput: \n\t%s\n",argv[1]);
 
-    Lexer *lexer;
+    Lexer lexer;
     if (argc > 1) {
 
-        FILE *f = fopen(argv[1], "r");
-        if (!f) return NULL;
+        const char *source = Lexer_ReadFile(argv[1]);
+        Lexer_Init(&lexer, argv[1], source, strlen(source));
 
-        Lexer_Init(lexer, Lexer_ReadFile(f), Lexer_FileSize(f));
-
-        fclose(f);
+        printf("source: \n\t%s\n", lexer.source);
+        
+        Token t;
+        Token_Init(&t, 10);
+        
+        Lexer_NextToken(&lexer, &t);
+        printf("(%i, %s)\n", t.type, t.lexeme);
+        
+        /*while (Lexer_NextToken(&lexer, &t)){
+            printf("(%i, %s)\n", t.type, t.lexeme);
+        }*/
     }
 
-    if (lexer)
-        printf("%s\n", lexer->source);
-    else
-        printf("Null\n");
 
     return 0;
 }
