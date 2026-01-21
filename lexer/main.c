@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <ctype.h>
 
 typedef enum  {
-    WHITESPACE,
     IDENTIFIER,
     LITERAL,
     OPERATOR,
@@ -15,19 +15,10 @@ typedef enum  {
 
 typedef struct {
     TokenType type;
-
-    size_t lexcap;
     char *lexeme;
 
     // optionally, location info for error messages
 } Token;
-
-void Token_Init(Token *token, int lexcap){
-    token->type = WHITESPACE;
-
-    token->lexcap = lexcap;
-    token->lexeme = calloc(token->lexcap, sizeof(char));
-}
 
 typedef struct {
     const char *filename;
@@ -48,33 +39,33 @@ void Lexer_Init(
 }
 
 bool Lexer_NextToken(Lexer *lexer, Token *token){
-    printf("NextToken\n");
-
-    if (lexer->pos >= lexer->length) {
-        printf("Finished");
-        return false;
-    }
+    unsigned char c;
     
-    int i = 0; // for lexeme
-    while(
-        lexer->pos < lexer->length &&
-        lexer->source[lexer->pos] != ' '
-    ){
-        if (i >= token->lexcap){
-            token->lexcap *= 2;
+    // skip all whitespace
+    while (
+        (c = (unsigned char)lexer->source[lexer->pos]) &&
+        isspace(c)
+    ) 
+        lexer->pos++;
 
-            char *new = realloc(token->lexeme, token->lexcap);
-            if (!new){
-                free(token->lexeme);
-                exit(1);
-            }
+    int start = lexer->pos;
 
-            token->lexeme = new;
-        }
-
-        token->lexeme[i++] = lexer->source[lexer->pos++];
-    }
-    token->lexeme[i] = '\0';
+    // consume token
+    while (
+        (c = (unsigned char)lexer->source[lexer->pos]) != '\0' &&
+        !isspace(c)
+    ) 
+        lexer->pos++;
+    
+    int length = lexer->pos - start;
+    if (!length)
+        return false;
+    
+    // fill lexeme
+    token->lexeme = malloc(length + 1);
+    for (int i = 0; i < length; i++)
+        token->lexeme[i] = lexer->source[start + i];
+    token->lexeme[length] = '\0';
 
     return true; // DO repeat
     // if no more, return false
@@ -125,16 +116,13 @@ int main(int argc, char *argv[]) {
         Lexer_Init(&lexer, argv[1], source, strlen(source));
 
         printf("source: \n\t%s\n", lexer.source);
+
         
         Token t;
-        Token_Init(&t, 10);
-        
-        Lexer_NextToken(&lexer, &t);
-        printf("(%i, %s)\n", t.type, t.lexeme);
-        
-        /*while (Lexer_NextToken(&lexer, &t)){
+
+        while(Lexer_NextToken(&lexer, &t))
             printf("(%i, %s)\n", t.type, t.lexeme);
-        }*/
+            
     }
 
 
