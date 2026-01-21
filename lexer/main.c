@@ -40,6 +40,11 @@ void Lexer_Init(
 
 bool Lexer_NextToken(Lexer *lexer, Token *token){
     unsigned char c;
+
+    char operators[] = {'=', '+', '-'}; // whoops make these strings too?
+    char *keywords[] = {
+        "int", "char", "for", "if", "while", 
+    };
     
     // skip all whitespace
     while (
@@ -50,14 +55,45 @@ bool Lexer_NextToken(Lexer *lexer, Token *token){
 
     int start = lexer->pos;
 
-    // consume token
-    while (
-        (c = (unsigned char)lexer->source[lexer->pos]) != '\0' &&
-        !isspace(c)
-    ) 
+    if(c == ';'){
         lexer->pos++;
+        token->type = SEPARATOR;
+    }
+    
+    else if (isdigit(c)){ // Eat until Not Digit(TM)
+        
+        token->type = LITERAL; // NUMBER literal?
+
+        while (
+            (c = (unsigned char)lexer->source[lexer->pos]) != '\0' && isdigit(c) 
+        ) 
+            lexer->pos++;
+        
+    }
+
+    else if (strchr(operators, c) != NULL){ // char IN operators
+        
+        token->type = OPERATOR;
+
+        while (
+            (c = (unsigned char)lexer->source[lexer->pos]) != '\0' && strchr(operators, c) != NULL
+        ) 
+            lexer->pos++;
+
+    }
+
+    else{ // Eat until Whitespace
+        token->type = IDENTIFIER;
+
+        while (
+            (c = (unsigned char)lexer->source[lexer->pos]) != '\0' && !isspace(c) 
+        ) 
+            lexer->pos++;
+
+    }
     
     int length = lexer->pos - start;
+    printf("Before RETURN early, length: %i, pos: %li, start: %i\n", length, lexer->pos, start);
     if (!length)
         return false;
     
@@ -66,6 +102,15 @@ bool Lexer_NextToken(Lexer *lexer, Token *token){
     for (int i = 0; i < length; i++)
         token->lexeme[i] = lexer->source[start + i];
     token->lexeme[length] = '\0';
+
+    // ok now see if its actually a keyword
+    if (token->type == IDENTIFIER){
+        for (int i = 0; i < sizeof(keywords) / sizeof(keywords[0]); i++){
+            //printf("%s\n", keywords[i]);
+            if (strcmp(token->lexeme, keywords[i]) == 0)
+                token->type = KEYWORD;
+        }
+    }
 
     return true; // DO repeat
     // if no more, return false
