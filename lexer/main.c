@@ -10,6 +10,7 @@ typedef enum  {
     OPERATOR,
     KEYWORD,
     SEPARATOR,
+    DELIMITER,
     // COMMENT, this will be ignored
 } TokenType;
 
@@ -59,6 +60,11 @@ bool Lexer_NextToken(Lexer *lexer, Token *token){
         lexer->pos++;
         token->type = SEPARATOR;
     }
+
+    else if (c == '{' || c == '}' || c == '(' || c == ')' || c == '[' || c == ']'){
+        lexer->pos++;
+        token->type = DELIMITER;
+    }
     
     else if (isdigit(c)){ // Eat until Not Digit(TM)
         
@@ -93,7 +99,7 @@ bool Lexer_NextToken(Lexer *lexer, Token *token){
     }
     
     int length = lexer->pos - start;
-    printf("Before RETURN early, length: %i, pos: %li, start: %i\n", length, lexer->pos, start);
+    //printf("Before RETURN early, length: %i, pos: %li, start: %i\n", length, lexer->pos, start);
     if (!length)
         return false;
     
